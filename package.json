@@ -1,0 +1,14 @@
+{
+  "name": "aitrader-vercel-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "실계좌 조회 전용 모니터 (place_order 없음) + 자체 대시보드 페이지 - Vercel Serverless Functions",
+  "dependencies": {
+    "@vercel/kv": "^2.0.0",
+    "next": "^14.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.12.0",
+    "lucide-react": "^0.383.0"
+  }
+}

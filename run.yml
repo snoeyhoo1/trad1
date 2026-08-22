@@ -1,0 +1,37 @@
+name: aitrader-scheduled-run
+
+on:
+  schedule:
+    # 한국시간(KST=UTC+9) 기준 평일 09:10 = UTC 00:10 (한국장)
+    - cron: "10 0 * * 1-5"
+    # 미국장 개장 직후: 한국시간 23:35 (서머타임 아닐 때) = UTC 14:35
+    - cron: "35 14 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run trading bot (paper/confirmation gated)
+        env:
+          AITRADER_MODE: paper
+          AITRADER_ORDERS_ENABLED: "false"
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          BYBIT_API_KEY: ${{ secrets.BYBIT_API_KEY }}
+          BYBIT_API_SECRET: ${{ secrets.BYBIT_API_SECRET }}
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+        run: python main.py
+      - name: Upload order log
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-log
+          path: execution/order_log.jsonl
+          if-no-files-found: ignore

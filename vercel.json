@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/monitor-alpaca",
+      "schedule": "0 23 * * *"
+    }
+  ]
+}

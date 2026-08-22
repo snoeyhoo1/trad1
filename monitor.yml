@@ -1,0 +1,53 @@
+name: aitrader-monitor
+
+on:
+  schedule:
+    # 15분마다 (GitHub Actions 무료 티어는 정시 보장 안 됨, 수 분 지연 가능)
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aitrader-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -r requirements.txt
+
+      - name: 실계좌 조회 + 모의 판단 실행 (주문 없음)
+        env:
+          AITRADER_MODE: paper
+          AITRADER_ORDERS_ENABLED: "false"
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_BASE_URL: ${{ secrets.ALPACA_BASE_URL }}
+          BYBIT_API_KEY: ${{ secrets.BYBIT_API_KEY }}
+          BYBIT_API_SECRET: ${{ secrets.BYBIT_API_SECRET }}
+          BYBIT_TESTNET: ${{ secrets.BYBIT_TESTNET }}
+          KIS_APP_KEY: ${{ secrets.KIS_APP_KEY }}
+          KIS_APP_SECRET: ${{ secrets.KIS_APP_SECRET }}
+          KIS_ACCOUNT_NO: ${{ secrets.KIS_ACCOUNT_NO }}
+          KIS_IS_VIRTUAL: ${{ secrets.KIS_IS_VIRTUAL }}
+        run: python monitor.py
+
+      - name: state.json 커밋
+        run: |
+          git config user.name "aitrader-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/state.json
+          git diff --quiet --cached || git commit -m "chore: update paper trading state [skip ci]"
+          git pull --rebase origin main || true
+          git push
