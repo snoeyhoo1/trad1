@@ -23,6 +23,7 @@ function redactPositions(positions) {
 }
 
 async function scanBroker(brokerName, mod, watchlist, state, now) {
+  const tally = { buy: 0, sell: 0, hold: 0, error: 0 };
   try {
     const equity = await mod.getAccountEquity();
     const positions = await mod.getPositions();
@@ -45,6 +46,7 @@ async function scanBroker(brokerName, mod, watchlist, state, now) {
       const sellTh = SELL_TH_BASE - regime.adj;
       const ens = runEnsemble(highs, lows, closes, buyTh, sellTh);
       const price = closes[closes.length - 1];
+      tally[ens.action] = (tally[ens.action] || 0) + 1;
 
       state.last_signals[key] = {
         score: Math.round(ens.finalScore * 10000) / 10000, action: ens.action,
@@ -74,9 +76,11 @@ async function scanBroker(brokerName, mod, watchlist, state, now) {
       }
       console.log(`[${brokerName}] ${symbol}: price=${price.toFixed(2)} score=${ens.finalScore.toFixed(3)} action=${ens.action}`);
     } catch (e) {
+      tally.error += 1;
       console.error(`[${brokerName}] ${symbol} 에러:`, e.message);
     }
   }
+  return tally;
 }
 
 /**
@@ -84,13 +88,33 @@ async function scanBroker(brokerName, mod, watchlist, state, now) {
  * 조회만 하고 실제 주문 함수는 이 파일 어디에도 존재하지 않음.
  */
 export async function runScan(brokerNames) {
+  const startedAt = Date.now();
   const now = new Date().toISOString();
   const state = await getState();
+  state.scan_log = state.scan_log || [];
+  state.news = state.news || [];
 
   for (const name of brokerNames) {
     const cfg = BROKERS[name];
     if (!cfg) continue;
-    await scanBroker(name, cfg.mod, cfg.watchlist, state, now);
+    const tally = await scanBroker(name, cfg.mod, cfg.watchlist, state, now);
+    state.scan_log.push({
+      t: now, broker: name, symbols: cfg.watchlist.length,
+      buy: tally.buy || 0, sell: tally.sell || 0, hold: tally.hold || 0, error: tally.error || 0,
+      duration_ms: Date.now() - startedAt,
+    });
+  }
+  state.scan_log = state.scan_log.slice(-100);
+
+  // Alpaca 조회 전용 키로 얻을 수 있는 실제 뉴스 (제목/출처/링크만, 본문 저장 안 함)
+  if (brokerNames.includes("alpaca")) {
+    try {
+      const symbols = BROKERS.alpaca.watchlist;
+      const news = await alpaca.getNews(symbols, 10);
+      state.news = news;
+    } catch (e) {
+      console.error("뉴스 조회 실패:", e.message);
+    }
   }
 
   state.equity_curve.push({ t: now, equity: Math.round(state.paper_equity * 100000) / 100000 });
