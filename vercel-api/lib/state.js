@@ -12,6 +12,7 @@ export const EMPTY_STATE = {
   last_signals: {},
   scan_log: [],
   news: [],
+  market_movers: null,
 };
 
 export async function getState() {
