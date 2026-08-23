@@ -10,6 +10,8 @@ export const EMPTY_STATE = {
   equity_curve: [],
   real_accounts: {},
   last_signals: {},
+  scan_log: [],
+  news: [],
 };
 
 export async function getState() {
