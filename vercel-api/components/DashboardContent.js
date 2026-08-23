@@ -116,6 +116,9 @@ export default function DashboardContent() {
         <div style={{ textAlign: "center", color: "#5C6479", fontSize: 12.5, padding: "40px 0" }}>불러오는 중...</div>
       ) : (
         <>
+          {/* 실시간 시세 티커 */}
+          {Object.keys(lastSignals).length > 0 && <PriceTicker lastSignals={lastSignals} />}
+
           {/* 요약 통계 */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 16 }}>
             <Stat label="누적 수익률 (모의)" value={`${totalReturn >= 0 ? "+" : ""}${totalReturn.toFixed(2)}%`}
@@ -162,24 +165,24 @@ export default function DashboardContent() {
             </ResponsiveContainer>
           </Panel>
 
-          {/* 최근 시그널 */}
-          <Panel title="최근 시그널 (종목별)">
+          {/* 최근 시그널 - 확률 게이지 */}
+          <Panel title="최근 시그널 · 우리가 거는 쪽의 확률">
             {Object.keys(lastSignals).length === 0 ? (
               <div style={{ color: "#5C6479", fontSize: 12 }}>데이터 없음</div>
             ) : (
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {Object.entries(lastSignals).map(([key, sig]) => (
-                  <div key={key} style={{ minWidth: 130, background: "#0A0C10", border: "1px solid #1B1F27", borderRadius: 8, padding: 10 }}>
-                    <div style={{ fontSize: 10.5, color: "#5C6479" }}>{key}</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: sig.price ? "#E7E9EE" : "#5C6479" }}>{sig.price?.toFixed(2)}</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 10.5 }}>
-                      <ActionTag action={sig.action} />
-                      <span style={{ color: "#5C6479" }}>{REGIME_LABEL[sig.vol_regime] || sig.vol_regime}</span>
-                    </div>
-                  </div>
-                ))}
+                {Object.entries(lastSignals)
+                  .sort((a, b) => new Date(b[1].t) - new Date(a[1].t))
+                  .map(([key, sig]) => (
+                    <SignalCard key={key} symbolKey={key} sig={sig} />
+                  ))}
               </div>
             )}
+            <div style={{ fontSize: 10, color: "#5C6479", marginTop: 10, lineHeight: 1.5 }}>
+              확률은 trend·momentum·mean_reversion 3개 에이전트의 가중 평균 점수입니다.
+              50%가 중립이고, 매수 임계값(기본 65%) 이상이면 매수, 매도 임계값(기본 35%) 이하면 매도로 판단합니다.
+              15분 간격 스캔 기준이라 매초 갱신되는 실시간 시세는 아닙니다.
+            </div>
           </Panel>
 
           {/* 거래 기록 */}
@@ -218,7 +221,10 @@ export default function DashboardContent() {
           </Panel>
         </>
       )}
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
     </div>
   );
 }
@@ -226,6 +232,73 @@ export default function DashboardContent() {
 function fmtTime(iso) {
   try { return new Date(iso).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); }
   catch { return iso; }
+}
+
+/** 실시간 느낌의 시세 티커 (마지막 스캔 기준 가격들이 옆으로 흐름) */
+function PriceTicker({ lastSignals }) {
+  const items = Object.entries(lastSignals);
+  if (items.length === 0) return null;
+  const rendered = [...items, ...items]; // 매끄러운 루프를 위해 두 번 반복
+  return (
+    <div style={{
+      background: "#12151B", border: "1px solid #1B1F27", borderRadius: 10,
+      padding: "8px 0", marginBottom: 14, overflow: "hidden", whiteSpace: "nowrap",
+    }}>
+      <div style={{
+        display: "inline-flex", animation: `ticker-scroll ${Math.max(items.length * 4, 12)}s linear infinite`,
+      }}>
+        {rendered.map(([key, sig], i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "0 20px", fontSize: 12.5 }}>
+            <span style={{ color: "#8B93A7" }}>{key}</span>
+            <span style={{ fontWeight: 700 }}>{sig.price?.toFixed(2)}</span>
+            <span style={{
+              color: sig.action === "buy" ? "#3DDC97" : sig.action === "sell" ? "#FF6B6B" : "#5C6479",
+              fontSize: 10.5,
+            }}>
+              {sig.action === "buy" ? "▲" : sig.action === "sell" ? "▼" : "·"} {Math.round(sig.score * 100)}%
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 앙상블 스코어를 "우리가 거는 쪽의 확률"로 시각화한 카드 */
+function SignalCard({ symbolKey, sig }) {
+  const pct = Math.round((sig.score ?? 0.5) * 100);
+  const color = sig.action === "buy" ? "#3DDC97" : sig.action === "sell" ? "#FF6B6B" : "#5C6479";
+  return (
+    <div style={{ minWidth: 150, background: "#0A0C10", border: "1px solid #1B1F27", borderRadius: 8, padding: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <span style={{ fontSize: 10.5, color: "#5C6479" }}>{symbolKey}</span>
+        <span style={{ fontSize: 9.5, color: "#5C6479" }}>{fmtTime(sig.t)}</span>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{sig.price?.toFixed(2)}</div>
+      <ProbabilityBar pct={pct} color={color} />
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 10.5 }}>
+        <ActionTag action={sig.action} />
+        <span style={{ color: "#5C6479" }}>{REGIME_LABEL[sig.vol_regime] || sig.vol_regime}</span>
+      </div>
+    </div>
+  );
+}
+
+function ProbabilityBar({ pct, color }) {
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#8B93A7", marginBottom: 3 }}>
+        <span>확률</span>
+        <span style={{ color, fontWeight: 700 }}>{pct}%</span>
+      </div>
+      <div style={{ height: 5, background: "#1B1F27", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{
+          width: `${pct}%`, height: "100%", background: color, borderRadius: 999,
+          transition: "width 0.4s ease",
+        }} />
+      </div>
+    </div>
+  );
 }
 
 function ActionTag({ action }) {
