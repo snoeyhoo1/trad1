@@ -58,6 +58,8 @@ export default function DashboardContent() {
 
   const realAccounts = state?.real_accounts || {};
   const lastSignals = state?.last_signals || {};
+  const scanLog = state?.scan_log || [];
+  const news = state?.news || [];
   const notUpdatedYet = state && !state.updated_at;
 
   return (
@@ -184,6 +186,48 @@ export default function DashboardContent() {
               15분 간격 스캔 기준이라 매초 갱신되는 실시간 시세는 아닙니다.
             </div>
           </Panel>
+
+          {/* 스캔 활동 로그 */}
+          <Panel title="스캔 활동 로그">
+            {scanLog.length === 0 ? (
+              <div style={{ color: "#5C6479", fontSize: 12 }}>아직 기록된 스캔이 없습니다.</div>
+            ) : (
+              <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                {[...scanLog].reverse().map((s, i) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "6px 0",
+                    borderTop: i === 0 ? "none" : "1px solid #1B1F27", fontSize: 11.5,
+                  }}>
+                    <span style={{ color: "#5C6479", minWidth: 76 }}>{fmtTime(s.t)}</span>
+                    <span style={{ minWidth: 70, fontWeight: 600 }}>{BROKER_LABEL[s.broker]?.split("(")[0] || s.broker}</span>
+                    <span style={{ color: "#8B93A7" }}>{s.symbols}종목 스캔</span>
+                    <span style={{ color: "#3DDC97" }}>매수{s.buy}</span>
+                    <span style={{ color: "#FF6B6B" }}>매도{s.sell}</span>
+                    <span style={{ color: "#5C6479" }}>관망{s.hold}</span>
+                    {s.error > 0 && <span style={{ color: "#F2B94A" }}>에러{s.error}</span>}
+                    <span style={{ color: "#5C6479", marginLeft: "auto" }}>{s.duration_ms}ms</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 뉴스 - Alpaca 실제 뉴스 API, 제목/출처/링크만 (본문 없음) */}
+          {news.length > 0 && (
+            <Panel title="관련 뉴스">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {news.map((n) => (
+                  <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                    <div style={{ fontSize: 12.5, color: "#E7E9EE", lineHeight: 1.4 }}>{n.headline}</div>
+                    <div style={{ fontSize: 10, color: "#5C6479", marginTop: 2 }}>
+                      {n.source} · {fmtTime(n.created_at)} · {n.symbols.join(", ")}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </Panel>
+          )}
 
           {/* 거래 기록 */}
           <Panel title={`누적 거래 기록 (${trades.length}건)`}>
