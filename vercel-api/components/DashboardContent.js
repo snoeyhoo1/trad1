@@ -60,6 +60,7 @@ export default function DashboardContent() {
   const lastSignals = state?.last_signals || {};
   const scanLog = state?.scan_log || [];
   const news = state?.news || [];
+  const marketMovers = state?.market_movers || null;
   const notUpdatedYet = state && !state.updated_at;
 
   return (
@@ -166,6 +167,36 @@ export default function DashboardContent() {
               </AreaChart>
             </ResponsiveContainer>
           </Panel>
+
+          {/* 전체 시장 스크리너 - Alpaca가 시장 전체를 훑어서 계산한 상승/하락 상위 */}
+          {marketMovers && (
+            <Panel title={`전체 시장 스크리너 (${fmtTime(marketMovers.t)} 기준)`}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div>
+                  <div style={{ fontSize: 10.5, color: "#3DDC97", marginBottom: 6 }}>상승률 상위</div>
+                  {marketMovers.gainers.slice(0, 8).map((m) => (
+                    <div key={m.symbol} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, padding: "3px 0" }}>
+                      <span>{m.symbol}</span>
+                      <span style={{ color: "#3DDC97" }}>+{m.percentChange?.toFixed(2)}%</span>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 10.5, color: "#FF6B6B", marginBottom: 6 }}>하락률 상위</div>
+                  {marketMovers.losers.slice(0, 8).map((m) => (
+                    <div key={m.symbol} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, padding: "3px 0" }}>
+                      <span>{m.symbol}</span>
+                      <span style={{ color: "#FF6B6B" }}>{m.percentChange?.toFixed(2)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: "#5C6479", marginTop: 10, lineHeight: 1.5 }}>
+                이 목록은 전체 시장 대비 등락률 상위일 뿐 매매 신호가 아닙니다. 이 종목들에 대한
+                실제 앙상블 판단은 아래 "최근 시그널"에서 source가 "시장"으로 표시된 카드로 확인하세요.
+              </div>
+            </Panel>
+          )}
 
           {/* 최근 시그널 - 확률 게이지 */}
           <Panel title="최근 시그널 · 우리가 거는 쪽의 확률">
@@ -315,7 +346,12 @@ function SignalCard({ symbolKey, sig }) {
   return (
     <div style={{ minWidth: 150, background: "#0A0C10", border: "1px solid #1B1F27", borderRadius: 8, padding: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ fontSize: 10.5, color: "#5C6479" }}>{symbolKey}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ fontSize: 10.5, color: "#5C6479" }}>{symbolKey}</span>
+          {sig.source === "market" && (
+            <span style={{ fontSize: 8.5, color: "#5B8DEF", border: "1px solid #2A3A5C", borderRadius: 4, padding: "1px 4px" }}>시장</span>
+          )}
+        </span>
         <span style={{ fontSize: 9.5, color: "#5C6479" }}>{fmtTime(sig.t)}</span>
       </div>
       <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{sig.price?.toFixed(2)}</div>
